@@ -114,6 +114,9 @@ public class Maze : MonoBehaviour
         }
     }
 
+
+
+
     /// <summary>
     ///4방위 복도를 검색한다. 
     /// </summary>

@@ -4,6 +4,7 @@ using UnityEngine;
 using System.Linq;
 
 
+[System.Serializable]
 public class PathMarker
 {
     public MapLocation location;
@@ -25,7 +26,7 @@ public class PathMarker
 
     public override bool Equals(object obj)
     {
-        if ((obj == null) || this.GetType().Equals(obj.GetType()))
+        if ((obj == null) || !this.GetType().Equals(obj.GetType()))
         {  
             return false;
         } else
@@ -45,8 +46,8 @@ public class FindPathAStar : MonoBehaviour
     public Material closeMateral;
     public Material openMateral;
 
-    List<PathMarker> open = new List<PathMarker>();
-    List<PathMarker> closed = new List<PathMarker>();
+    public List<PathMarker> open = new List<PathMarker>();
+    public List<PathMarker> closed = new List<PathMarker>();
 
     public GameObject start;
     public GameObject end;
@@ -60,12 +61,12 @@ public class FindPathAStar : MonoBehaviour
 
     GameObject Unit;
     bool isMove = false;
-    List<Vector3> movePath = new List<Vector3>();
+    public List<Vector3> movePath = new List<Vector3>();
 
     void RemoveAllMarkers()
     {
         GameObject[] markers = GameObject.FindGameObjectsWithTag("marker");
-        foreach(GameObject m in markers)
+        foreach (GameObject m in markers)
         {
             Destroy(m);
         }
@@ -77,11 +78,12 @@ public class FindPathAStar : MonoBehaviour
         RemoveAllMarkers();
 
         List<MapLocation> locations = new List<MapLocation>();
-        for(int z = 1; z < maze.depth - 1; z++)
+        for (int z = 1; z < maze.depth - 1; z++)
         {
-            for(int x = 1; x < maze.width - 1; x++)
+            for (int x = 1; x < maze.width - 1; x++)
             {
-                locations.Add(new MapLocation(x,z));
+                if (maze.map[x,z] != 1) 
+                    locations.Add(new MapLocation(x, z));
             }
         }
 
@@ -109,21 +111,21 @@ public class FindPathAStar : MonoBehaviour
             return;
         }
 
-        foreach(MapLocation dir in maze.directions)
+        foreach (MapLocation dir in maze.directions)
         {
             MapLocation neighbor = dir + thisNode.location;
 
-            if(maze.map[neighbor.x, neighbor.z] == 1)
+            if (maze.map[neighbor.x, neighbor.z] == 1)
             {
                 continue;
             }
 
-            if(neighbor.x < 1 || neighbor.x >= maze.width || neighbor.z < 1 || neighbor.z >= maze.depth)
+            if (neighbor.x < 1 || neighbor.x >= maze.width || neighbor.z < 1 || neighbor.z >= maze.depth)
             {
                 continue;
             }
 
-            if(IsClosed(neighbor))
+            if (IsClosed(neighbor))
             {
                 continue;
             }
@@ -138,10 +140,10 @@ public class FindPathAStar : MonoBehaviour
             values[1].text = "H : " + H.ToString("0.00");
             values[2].text = "F : " + F.ToString("0.00");
 
-            if(UpdateMarker(neighbor, G,H,F, thisNode))
+            if (!UpdateMarker(neighbor, G, H, F, thisNode))
             {
                 open.Add(new PathMarker(neighbor, G, H, F, pathBlock, thisNode));
-            }
+            } 
 
         }
 
@@ -158,14 +160,109 @@ public class FindPathAStar : MonoBehaviour
         lastPos = pm;
     }
 
-    bool IsClosed(MapLocation mapLocation)
+    bool UpdateMarker(MapLocation pos, float g, float h, float f, PathMarker prt)
     {
-        return false;
-    }
-    
-    bool UpdateMarker(MapLocation mapLocation, float G, float H, float F, PathMarker thisNode)
-    {
+        foreach (PathMarker p in open)
+        {
+            if (p.location.Equals(pos))
+            {
+                p.G = g;
+                p.H = h;
+                p.F = f;
+                p.parent = prt;
+                return true;
+            }
+        }
+
         return false;
     }
 
+    bool IsClosed(MapLocation marker)
+    {
+        foreach (PathMarker p in closed)
+        {
+            if (p.location.Equals(marker))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void GetPath()
+    {
+        RemoveAllMarkers();
+        PathMarker begin = lastPos;
+
+        while (!startNode.Equals(begin) && begin != null)
+        {
+            Instantiate(pathP, new Vector3(begin.location.x * maze.scale, 0, begin.location.z * maze.scale), Quaternion.identity);
+            begin = begin.parent;
+        }
+
+        Instantiate(pathP, new Vector3(begin.location.x * maze.scale, 0, begin.location.z * maze.scale), Quaternion.identity);
+
+
+    }
+
+    void SetMvoePath()
+    {
+        PathMarker begin = lastPos;
+        while(!startNode.Equals(begin) && begin != null)
+        {
+            movePath.Add(new Vector3(begin.location.x * maze.scale, 0, begin.location.z * maze.scale));
+            begin = begin.parent;
+        }
+
+        movePath.Add(new Vector3(startNode.location.x * maze.scale, 0, startNode.location.z * maze.scale));
+        movePath.Reverse();
+    }
+
+    private void Update()
+    {
+        if(Input.GetKeyDown(KeyCode.P))
+        {
+            BeginSearch();
+        }
+
+        if(Input.GetKeyDown(KeyCode.C) && !done)
+        {
+            Search(lastPos);
+        }
+
+        if(Input.GetKeyDown(KeyCode.M))
+        {
+            GetPath();
+        }
+
+        if(Input.GetKeyDown(KeyCode.R))
+        {
+            SetMvoePath();  
+            Unit = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            Unit.transform.position = movePath[0];
+            isMove = true;
+        }
+
+        if(isMove)
+        {
+            if(movePath.Count > 0)
+            {
+                if(Vector3.Distance(Unit.transform.position, movePath[0]) > 0.01f)
+                {
+                    Unit.transform.position = Vector3.MoveTowards(Unit.transform.position, movePath[0], 1.0f * maze.scale * Time.deltaTime);
+                }
+                else
+                {
+                    Debug.Log("test");
+                    Unit.transform.position = movePath[0];
+                    movePath.RemoveAt(0);
+                }
+            }
+            else
+            {
+                isMove = false;
+            }
+        }
+    }
 }
+
